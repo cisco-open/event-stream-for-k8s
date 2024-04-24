@@ -11,6 +11,8 @@ use tokio::sync::mpsc::Receiver;
 
 static CACHE_TTL: u64 = 3600;
 
+// TODO: Metrics
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = kube::Client::try_default().await?;
@@ -28,13 +30,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .applied_objects();
     let mut stream = pin!(stream);
 
+    // TODO: Handle corrupt DB
     let db = sled::open("k8s-events-bookmarks")?;
 
+    // TODO: Is this queue size make sense?
     let (events_tx, events_rx) = tokio::sync::mpsc::channel::<Event>(1024);
 
     tokio::spawn(event_writer_task(db.clone(), events_rx));
     tokio::spawn(cache_cleanup_task(db.clone()));
 
+    // TODO: Handle restarts/disconnects without crashing/exiting.
     while let Some(event) = stream.try_next().await? {
         events_tx.send(event).await?;
     }
@@ -42,6 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
+    // TODO: Handle errros, be able to restart. Reduce .unwrap() usage.
     eprintln!("Starting event writer task...");
     /*
     K - 11
@@ -89,6 +95,7 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
 }
 
 async fn cache_cleanup_task(db: sled::Db) {
+    // TODO: Handle errros, be able to restart. Reduce .unwrap() usage.
     eprintln!("Starting cache cleaner task...");
     loop {
         let now = UNIX_EPOCH.elapsed().unwrap().as_secs();
