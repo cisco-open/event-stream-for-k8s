@@ -63,7 +63,6 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
     ------
        120
     */
-    let hasher = ahash::RandomState::with_seeds(120, 4, 23, 2024);
     loop {
         let mut events = vec![];
         events_rx.recv_many(&mut events, 1024).await;
@@ -72,16 +71,26 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
         let mut cache_hits: usize = 0;
         let mut cache_misses: usize = 0;
         for event in events {
-            let json_event = serde_json::to_string(&event).unwrap();
-            let event_hash = u64_to_u8_arr(hasher.hash_one(&json_event));
-            if db.contains_key(event_hash).unwrap() {
+            let key = format!(
+                "{}:{}",
+                event.metadata.uid.as_ref().unwrap_or(&String::default()),
+                event
+                    .metadata
+                    .resource_version
+                    .as_ref()
+                    .unwrap_or(&String::default())
+            );
+            if db.contains_key(key.as_str()).unwrap() {
                 cache_hits += 1;
                 continue;
             }
             cache_misses += 1;
+
+            let json_event = serde_json::to_string(&event).unwrap();
             println!("{}", json_event);
+
             batch.insert(
-                &event_hash,
+                key.as_str(),
                 &u64_to_u8_arr(UNIX_EPOCH.elapsed().unwrap().as_secs()),
             );
         }
