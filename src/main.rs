@@ -30,8 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .applied_objects();
     let mut stream = pin!(stream);
 
-    // TODO: Handle corrupt DB
-    let db = sled::open("k8s-events-bookmarks")?;
+    let db = get_db("k8s-events-bookmarks")?;
 
     // TODO: Is this queue size make sense?
     let (events_tx, events_rx) = tokio::sync::mpsc::channel::<Event>(1024);
@@ -44,6 +43,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         events_tx.send(event).await?;
     }
     Ok(())
+}
+
+fn get_db(path: &str) -> Result<sled::Db, sled::Error> {
+    match sled::open(path) {
+        Ok(db) => Ok(db),
+        Err(sled::Error::Corruption { .. } | sled::Error::Unsupported(_)) => {
+            std::fs::remove_dir_all(path)?;
+            eprintln!("DB corrupt; recreating it");
+            get_db(path)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
