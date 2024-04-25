@@ -7,13 +7,31 @@ use k8s_openapi::api::core::v1::Event;
 use kube::runtime::watcher::{self, InitialListStrategy, ListSemantic};
 use kube::runtime::WatchStreamExt;
 use kube::Api;
+use once_cell::sync::{Lazy, OnceCell};
+use prometheus_exporter::prometheus::{
+    opts, register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,
+};
 use sled::Batch;
 use tokio::sync::mpsc::Receiver;
 
 mod config;
 
 use config::CONFIG;
-// TODO: Metrics
+
+static PROM_EVENTS: Lazy<OnceCell<IntCounterVec>> = Lazy::new(|| {
+    register_int_counter_vec!(
+        opts!("kube_event_stream_events_processed", "Events seen"),
+        // COMBAK: or separate counters
+        &["type"]
+    )
+    .unwrap()
+    .into()
+});
+static PROM_BYTES: Lazy<OnceCell<IntCounter>> = Lazy::new(|| {
+    register_int_counter!("kube_event_stream_bytes_synced", "Bytes synced to cache")
+        .unwrap()
+        .into()
+});
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,6 +54,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: Is this queue size make sense?
     let (events_tx, events_rx) = tokio::sync::mpsc::channel::<Event>(1024);
+
+    prometheus_exporter::start("0.0.0.0:9000".parse().unwrap())?;
 
     tokio::spawn(event_writer_task(db.clone(), events_rx));
     tokio::spawn(cache_cleanup_task(db.clone()));
@@ -62,20 +82,6 @@ fn get_db(path: &Path) -> Result<sled::Db, sled::Error> {
 async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
     // TODO: Handle errros, be able to restart. Reduce .unwrap() usage.
     eprintln!("Starting event writer task...");
-    /*
-    K - 11
-    u - 21
-    b -  2
-    e -  5
-    r - 18
-    n - 14
-    e -  5
-    t - 20
-    e -  5
-    s - 19
-    ------
-       120
-    */
     loop {
         let mut events = vec![];
         let events_count = events_rx.recv_many(&mut events, 1024).await;
@@ -84,8 +90,8 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
             break;
         }
         let mut batch = Batch::default();
-        let mut cache_hits: usize = 0;
-        let mut cache_misses: usize = 0;
+        let mut cache_hits: u64 = 0;
+        let mut cache_misses: u64 = 0;
         for event in events {
             let key = format!(
                 "{}:{}",
@@ -111,6 +117,22 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
         }
         db.apply_batch(batch).unwrap();
         let bytes_synced = db.flush_async().await.unwrap();
+
+        let prom_events = PROM_EVENTS.get().unwrap();
+        prom_events
+            .with_label_values(&["total"])
+            .inc_by(events_count.try_into().unwrap());
+        prom_events
+            .with_label_values(&["cache_hits"])
+            .inc_by(cache_hits);
+        prom_events
+            .with_label_values(&["cache_misses"])
+            .inc_by(cache_misses);
+        PROM_BYTES
+            .get()
+            .unwrap()
+            .inc_by(bytes_synced.try_into().unwrap());
+
         eprintln!(
             "Processed {} events, out of which {} were already seen and {} were new. {} bytes synced to DB.",
             events_count, cache_hits, cache_misses, bytes_synced
