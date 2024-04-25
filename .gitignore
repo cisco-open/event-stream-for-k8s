@@ -1,3 +1,4 @@
 /target
 k8s-events-bookmarks
 events-db
+coverage.xml
