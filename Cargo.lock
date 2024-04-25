@@ -693,10 +693,10 @@ dependencies = [
 name = "kubernetes-event-stream"
 version = "0.1.0"
 dependencies = [
- "ahash",
  "futures",
  "k8s-openapi",
  "kube",
+ "once_cell",
  "serde_json",
  "sled",
  "tokio",
