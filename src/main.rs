@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::pin::pin;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -9,12 +10,15 @@ use kube::Api;
 use sled::Batch;
 use tokio::sync::mpsc::Receiver;
 
-static CACHE_TTL: u64 = 3600;
+mod config;
 
+use config::CONFIG;
 // TODO: Metrics
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let db = get_db(&CONFIG.cache_db)?;
+
     let client = kube::Client::try_default().await?;
 
     let api: Api<Event> = Api::all(client);
@@ -30,8 +34,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .applied_objects();
     let mut stream = pin!(stream);
 
-    let db = get_db("k8s-events-bookmarks")?;
-
     // TODO: Is this queue size make sense?
     let (events_tx, events_rx) = tokio::sync::mpsc::channel::<Event>(1024);
 
@@ -45,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn get_db(path: &str) -> Result<sled::Db, sled::Error> {
+fn get_db(path: &Path) -> Result<sled::Db, sled::Error> {
     match sled::open(path) {
         Ok(db) => Ok(db),
         Err(sled::Error::Corruption { .. } | sled::Error::Unsupported(_)) => {
@@ -76,9 +78,12 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
     */
     loop {
         let mut events = vec![];
-        events_rx.recv_many(&mut events, 1024).await;
+        let events_count = events_rx.recv_many(&mut events, 1024).await;
+        if events_count == 0 {
+            eprintln!("Shutting down event writer...");
+            break;
+        }
         let mut batch = Batch::default();
-        let events_count = events.len();
         let mut cache_hits: usize = 0;
         let mut cache_misses: usize = 0;
         for event in events {
@@ -97,8 +102,7 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
             }
             cache_misses += 1;
 
-            let json_event = serde_json::to_string(&event).unwrap();
-            println!("{}", json_event);
+            println!("{}", serde_json::to_string(&event).unwrap());
 
             batch.insert(
                 key.as_str(),
@@ -123,7 +127,7 @@ async fn cache_cleanup_task(db: sled::Db) {
         while let Some(Ok((k, v))) = db.iter().next() {
             let ts = u8_slice_to_u64(v.as_ref());
             // eprintln!("now={} ts={} CACHE_TTL={}", now, ts, CACHE_TTL);
-            if ts + CACHE_TTL < now {
+            if ts + CONFIG.cache_ttl < now {
                 // eprintln!("{:?} is to be deleted", k);
                 db.remove(k).unwrap();
                 purged += 1;
@@ -131,7 +135,7 @@ async fn cache_cleanup_task(db: sled::Db) {
         }
         eprintln!(
             "Purged {} entries older than {} secs from the cache",
-            purged, CACHE_TTL
+            purged, CONFIG.cache_ttl
         );
         if let Err(e) = db.flush_async().await {
             eprintln!("Error during fsync(): {:?}", e);
