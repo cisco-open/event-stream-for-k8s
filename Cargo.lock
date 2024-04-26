@@ -729,6 +729,7 @@ dependencies = [
  "kube",
  "once_cell",
  "prometheus_exporter",
+ "serde",
  "serde_json",
  "sled",
  "thiserror",

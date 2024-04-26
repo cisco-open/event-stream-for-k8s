@@ -5,6 +5,7 @@ use std::time::{Duration, UNIX_EPOCH};
 use futures::future::{select, select_all, Either};
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Event;
+use k8s_openapi::serde::Serialize;
 use kube::runtime::watcher::{self, InitialListStrategy, ListSemantic};
 use kube::runtime::WatchStreamExt;
 use kube::{Api, Client};
@@ -67,6 +68,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Bye!");
 
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct KubernetesEvent {
+    kubernetes_event: Event,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -187,7 +193,12 @@ async fn event_writer_task(
             }
             cache_misses += 1;
 
-            println!("{}", serde_json::to_string(&event)?);
+            println!(
+                "{}",
+                serde_json::to_string(&KubernetesEvent {
+                    kubernetes_event: event
+                })?
+            );
 
             batch.insert(
                 key.as_str(),
