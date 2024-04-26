@@ -2,3 +2,5 @@
 k8s-events-bookmarks
 events-db
 coverage.xml
+venv
+__pycache__

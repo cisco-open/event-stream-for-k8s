@@ -2,17 +2,21 @@ use std::path::Path;
 use std::pin::pin;
 use std::time::{Duration, UNIX_EPOCH};
 
-use futures::TryStreamExt;
+use futures::future::{select, select_all, Either};
+use futures::StreamExt;
 use k8s_openapi::api::core::v1::Event;
 use kube::runtime::watcher::{self, InitialListStrategy, ListSemantic};
 use kube::runtime::WatchStreamExt;
-use kube::Api;
+use kube::{Api, Client};
 use once_cell::sync::{Lazy, OnceCell};
 use prometheus_exporter::prometheus::{
     opts, register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,
 };
 use sled::Batch;
-use tokio::sync::mpsc::Receiver;
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::sync::broadcast;
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 mod config;
 
@@ -39,6 +43,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = kube::Client::try_default().await?;
 
+    // TODO: Is this queue size make sense?
+    let (ev_tx, ev_rx) = tokio::sync::mpsc::channel::<Event>(1024);
+
+    let _exporter = prometheus_exporter::start("0.0.0.0:9000".parse()?)?;
+
+    let (term_tx, term_rx) = tokio::sync::broadcast::channel::<()>(1);
+
+    let writer = tokio::spawn(event_writer_task(db.clone(), ev_rx, term_rx.resubscribe()));
+    let cleaner = tokio::spawn(cache_cleanup_task(db.clone(), term_rx.resubscribe()));
+    let watcher = tokio::spawn(event_watcher_task(client, ev_tx, term_rx.resubscribe()));
+    let term_req = tokio::spawn(term_request());
+
+    // Wait for any task to complete.
+    let _ = select_all(vec![writer, cleaner, watcher, term_req]).await;
+
+    // Broadcast the shutdown signal to all tasks.
+    term_tx.send(())?;
+
+    // Give the tasks a chance to notice and stop.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    eprintln!("Bye!");
+
+    Ok(())
+}
+
+#[derive(thiserror::Error, Debug)]
+enum KesError {
+    #[error(transparent)]
+    ChannelSend(#[from] SendError<Event>),
+    #[error(transparent)]
+    Watcher(#[from] kube::runtime::watcher::Error),
+    #[error(transparent)]
+    Database(#[from] sled::Error),
+    #[error(transparent)]
+    EventSerialization(#[from] serde_json::Error),
+    #[error(transparent)]
+    SystemTime(#[from] std::time::SystemTimeError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+async fn term_request() -> Result<(), KesError> {
+    select(
+        Box::pin(signal(SignalKind::interrupt())?.recv()),
+        Box::pin(signal(SignalKind::terminate())?.recv()),
+    )
+    .await;
+    eprintln!("User initiatied shutdown started!");
+    Ok(())
+}
+
+async fn event_watcher_task(
+    client: Client,
+    events_tx: Sender<Event>,
+    mut term_rx: broadcast::Receiver<()>,
+) -> Result<(), KesError> {
+    eprintln!("Starting event watcher task...");
+
     let api: Api<Event> = Api::all(client);
 
     let watcher_config = watcher::Config {
@@ -52,19 +115,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .applied_objects();
     let mut stream = pin!(stream);
 
-    // TODO: Is this queue size make sense?
-    let (events_tx, events_rx) = tokio::sync::mpsc::channel::<Event>(1024);
-
-    prometheus_exporter::start("0.0.0.0:9000".parse().unwrap())?;
-
-    tokio::spawn(event_writer_task(db.clone(), events_rx));
-    tokio::spawn(cache_cleanup_task(db.clone()));
-
-    // TODO: Handle restarts/disconnects without crashing/exiting.
-    while let Some(event) = stream.try_next().await? {
-        events_tx.send(event).await?;
+    loop {
+        match select(stream.next(), pin!(term_rx.recv())).await {
+            Either::Left((Some(Ok(event)), _)) => events_tx.send(event).await?,
+            Either::Left((Some(Err(e)), _)) => {
+                eprintln!("Error receiving events: {:?}", e);
+            }
+            Either::Left((None, _)) | Either::Right(_) => {
+                eprintln!("Stopping event watcher task!");
+                return Ok(());
+            }
+        }
     }
-    Ok(())
 }
 
 fn get_db(path: &Path) -> Result<sled::Db, sled::Error> {
@@ -79,16 +141,33 @@ fn get_db(path: &Path) -> Result<sled::Db, sled::Error> {
     }
 }
 
-async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
+async fn event_writer_task(
+    db: sled::Db,
+    mut events_rx: Receiver<Event>,
+    mut term_rx: broadcast::Receiver<()>,
+) -> Result<(), KesError> {
     // TODO: Handle errros, be able to restart. Reduce .unwrap() usage.
     eprintln!("Starting event writer task...");
     loop {
         let mut events = vec![];
-        let events_count = events_rx.recv_many(&mut events, 1024).await;
-        if events_count == 0 {
-            eprintln!("Shutting down event writer...");
-            break;
-        }
+
+        let events_count = match select(
+            pin!(events_rx.recv_many(&mut events, 1024)),
+            pin!(term_rx.recv()),
+        )
+        .await
+        {
+            Either::Left((0, _)) => {
+                eprintln!("Event channel dropped, stopping event writer task!");
+                return Ok(());
+            }
+            Either::Left((c, _)) => c,
+            Either::Right(_) => {
+                eprintln!("Stopping event writer task!");
+                return Ok(());
+            }
+        };
+
         let mut batch = Batch::default();
         let mut cache_hits: u64 = 0;
         let mut cache_misses: u64 = 0;
@@ -102,21 +181,21 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
                     .as_ref()
                     .unwrap_or(&String::default())
             );
-            if db.contains_key(key.as_str()).unwrap() {
+            if db.contains_key(key.as_str())? {
                 cache_hits += 1;
                 continue;
             }
             cache_misses += 1;
 
-            println!("{}", serde_json::to_string(&event).unwrap());
+            println!("{}", serde_json::to_string(&event)?);
 
             batch.insert(
                 key.as_str(),
-                &u64_to_u8_arr(UNIX_EPOCH.elapsed().unwrap().as_secs()),
+                &u64_to_u8_arr(UNIX_EPOCH.elapsed()?.as_secs()),
             );
         }
-        db.apply_batch(batch).unwrap();
-        let bytes_synced = db.flush_async().await.unwrap();
+        db.apply_batch(batch)?;
+        let bytes_synced = db.flush_async().await?;
 
         let prom_events = PROM_EVENTS.get().unwrap();
         prom_events
@@ -140,29 +219,42 @@ async fn event_writer_task(db: sled::Db, mut events_rx: Receiver<Event>) {
     }
 }
 
-async fn cache_cleanup_task(db: sled::Db) {
-    // TODO: Handle errros, be able to restart. Reduce .unwrap() usage.
+async fn cache_cleanup_task(
+    db: sled::Db,
+    mut term_rx: broadcast::Receiver<()>,
+) -> Result<(), KesError> {
     eprintln!("Starting cache cleaner task...");
     loop {
-        let now = UNIX_EPOCH.elapsed().unwrap().as_secs();
+        let now = UNIX_EPOCH.elapsed()?.as_secs();
         let mut purged: usize = 0;
-        while let Some(Ok((k, v))) = db.iter().next() {
+
+        for item in db.iter() {
+            let (k, v) = item?;
             let ts = u8_slice_to_u64(v.as_ref());
-            // eprintln!("now={} ts={} CACHE_TTL={}", now, ts, CACHE_TTL);
             if ts + CONFIG.cache_ttl < now {
-                // eprintln!("{:?} is to be deleted", k);
-                db.remove(k).unwrap();
+                db.remove(k)?;
                 purged += 1;
             }
         }
-        eprintln!(
-            "Purged {} entries older than {} secs from the cache",
-            purged, CONFIG.cache_ttl
-        );
-        if let Err(e) = db.flush_async().await {
-            eprintln!("Error during fsync(): {:?}", e);
+
+        if purged > 0 {
+            eprintln!(
+                "Purged {} entries older than {} secs from the cache",
+                purged, CONFIG.cache_ttl
+            );
+            db.flush_async().await?;
         }
-        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        // This is too frequent, but for now we want to test if deadlocks will happen
+        if let Either::Right(_) = select(
+            pin!(tokio::time::sleep(Duration::from_secs(5))),
+            pin!(term_rx.recv()),
+        )
+        .await
+        {
+            eprintln!("Stopping cache cleaner task!");
+            return Ok(());
+        };
     }
 }
 
