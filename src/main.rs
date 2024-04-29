@@ -9,9 +9,10 @@ use k8s_openapi::serde::Serialize;
 use kube::runtime::watcher::{self, InitialListStrategy, ListSemantic};
 use kube::runtime::WatchStreamExt;
 use kube::{Api, Client};
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use prometheus_exporter::prometheus::{
-    opts, register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,
+    opts, register_int_counter, register_int_counter_vec, register_int_gauge_vec, IntCounter,
+    IntCounterVec, IntGaugeVec,
 };
 use sled::Batch;
 use tokio::signal::unix::{signal, SignalKind};
@@ -23,19 +24,32 @@ mod config;
 
 use config::CONFIG;
 
-static PROM_EVENTS: Lazy<OnceCell<IntCounterVec>> = Lazy::new(|| {
+static PROM_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         opts!("kube_event_stream_events_processed", "Events seen"),
         // COMBAK: or separate counters
         &["type"]
     )
     .unwrap()
-    .into()
 });
-static PROM_BYTES: Lazy<OnceCell<IntCounter>> = Lazy::new(|| {
-    register_int_counter!("kube_event_stream_bytes_synced", "Bytes synced to cache")
-        .unwrap()
-        .into()
+
+static PROM_DB_BYTES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "kube_event_stream_cachedb_sync_bytes",
+        "Bytes synced to cache"
+    )
+    .unwrap()
+});
+
+static PROM_DB_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        opts!(
+            "kube_event_stream_cachedb_size",
+            "On disk cache sizes, item count and total bytes."
+        ),
+        &["type"]
+    )
+    .unwrap()
 });
 
 #[tokio::main]
@@ -208,20 +222,16 @@ async fn event_writer_task(
         db.apply_batch(batch)?;
         let bytes_synced = db.flush_async().await?;
 
-        let prom_events = PROM_EVENTS.get().unwrap();
-        prom_events
+        PROM_EVENTS
             .with_label_values(&["total"])
             .inc_by(events_count.try_into().unwrap());
-        prom_events
+        PROM_EVENTS
             .with_label_values(&["cache_hits"])
             .inc_by(cache_hits);
-        prom_events
+        PROM_EVENTS
             .with_label_values(&["cache_misses"])
             .inc_by(cache_misses);
-        PROM_BYTES
-            .get()
-            .unwrap()
-            .inc_by(bytes_synced.try_into().unwrap());
+        PROM_DB_BYTES.inc_by(bytes_synced.try_into().unwrap());
 
         eprintln!(
             "Processed {} events, out of which {} were already seen and {} were new. {} bytes synced to DB.",
@@ -255,6 +265,14 @@ async fn cache_cleanup_task(
             );
             db.flush_async().await?;
         }
+
+        PROM_DB_SIZE
+            .with_label_values(&["items"])
+            .set(db.len() as i64);
+
+        PROM_DB_SIZE
+            .with_label_values(&["bytes"])
+            .set(db.size_on_disk()? as i64);
 
         // This is too frequent, but for now we want to test if deadlocks will happen
         if let Either::Right(_) = select(
