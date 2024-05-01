@@ -3,13 +3,13 @@ use std::path::PathBuf;
 
 use once_cell::sync::Lazy;
 
-pub static CONFIG: Lazy<Config> = Lazy::new(Config::from_env);
+pub(crate) static CONFIG: Lazy<Config> = Lazy::new(Config::from_env);
 
 static CACHE_TTL_DEFAULT: u64 = 3600;
 static CACHE_DB_DEFAULT: &str = "events-db";
 
 #[derive(Debug, Clone)]
-pub struct Config {
+pub(crate) struct Config {
     pub cache_ttl: u64,
     pub cache_db: PathBuf,
 }
