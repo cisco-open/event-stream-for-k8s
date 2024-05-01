@@ -17,7 +17,7 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::config::CONFIG;
-use crate::types::{timestamp, KesError, KubernetesEvent};
+use crate::types::{KesError, KubernetesEvent};
 use crate::{u64_to_u8_arr, u8_slice_to_u64};
 
 static PROM_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -77,31 +77,17 @@ pub(crate) async fn write_events(
         let mut cache_hits: u64 = 0;
         let mut cache_misses: u64 = 0;
         for event in events {
-            let key = format!(
-                "{}:{}",
-                event.metadata.uid.as_ref().unwrap_or(&String::default()),
-                event
-                    .metadata
-                    .resource_version
-                    .as_ref()
-                    .unwrap_or(&String::default())
-            );
-            if db.contains_key(key.as_str())? {
+            let event = KubernetesEvent::from(event);
+            if db.contains_key(event.key().as_str())? {
                 cache_hits += 1;
                 continue;
             }
             cache_misses += 1;
 
-            println!(
-                "{}",
-                serde_json::to_string(&KubernetesEvent {
-                    time: timestamp(&event),
-                    kubernetes_event: event
-                })?
-            );
+            println!("{}", serde_json::to_string(&event)?);
 
             batch.insert(
-                key.as_str(),
+                event.key().as_str(),
                 &u64_to_u8_arr(UNIX_EPOCH.elapsed()?.as_secs()),
             );
         }
