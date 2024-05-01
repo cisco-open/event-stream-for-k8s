@@ -17,13 +17,12 @@ use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::config::CONFIG;
-use crate::types::{KesError, KubernetesEvent};
+use crate::types::{timestamp, KesError, KubernetesEvent};
 use crate::{u64_to_u8_arr, u8_slice_to_u64};
 
 static PROM_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         opts!("kube_event_stream_events_processed", "Events seen"),
-        // COMBAK: or separate counters
         &["type"]
     )
     .unwrap()
@@ -53,7 +52,6 @@ pub(crate) async fn write_events(
     mut events_rx: Receiver<Event>,
     mut term_rx: broadcast::Receiver<()>,
 ) -> Result<(), KesError> {
-    // TODO: Handle errros, be able to restart. Reduce .unwrap() usage.
     eprintln!("Starting event writer task...");
     loop {
         let mut events = vec![];
@@ -97,6 +95,7 @@ pub(crate) async fn write_events(
             println!(
                 "{}",
                 serde_json::to_string(&KubernetesEvent {
+                    time: timestamp(&event),
                     kubernetes_event: event
                 })?
             );

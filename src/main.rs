@@ -19,7 +19,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = kube::Client::try_default().await?;
 
-    // TODO: Is this queue size make sense?
     let (ev_tx, ev_rx) = tokio::sync::mpsc::channel::<Event>(1024);
 
     let _exporter = prometheus_exporter::start("0.0.0.0:9000".parse()?)?;
