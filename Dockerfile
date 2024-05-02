@@ -9,7 +9,7 @@ COPY . .
 RUN --mount=type=cache,target=/home/rust/.cargo/git \
     --mount=type=cache,target=/home/rust/.cargo/registry \
     --mount=type=cache,target=target \
-    cargo install --path=. --target=${target} 
+    cargo install --path=. --target=${target}
 
 FROM artifactory.thousandeyes.com/docker-hub/ubuntu:latest
 
