@@ -78,7 +78,8 @@ pub(crate) async fn write_events(
         let mut cache_misses: u64 = 0;
         for event in events {
             let event = KubernetesEvent::from(event);
-            if db.contains_key(event.key().as_str())? {
+            let key = event.key();
+            if db.contains_key(key.as_str())? {
                 cache_hits += 1;
                 continue;
             }
@@ -87,7 +88,7 @@ pub(crate) async fn write_events(
             println!("{}", serde_json::to_string(&event)?);
 
             batch.insert(
-                event.key().as_str(),
+                key.as_str(),
                 &u64_to_u8_arr(UNIX_EPOCH.elapsed()?.as_secs()),
             );
         }
