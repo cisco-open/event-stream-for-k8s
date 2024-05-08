@@ -15,6 +15,7 @@ use prometheus_exporter::prometheus::{
 use sled::Batch;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::{debug, error, info, warn};
 
 use crate::config::CONFIG;
 use crate::types::{KesError, KubernetesEvent};
@@ -52,7 +53,7 @@ pub(crate) async fn write_events(
     mut events_rx: Receiver<Event>,
     mut term_rx: broadcast::Receiver<()>,
 ) -> Result<(), KesError> {
-    eprintln!("Starting event writer task...");
+    info!("Starting event writer task...");
     loop {
         let mut events = vec![];
 
@@ -63,12 +64,12 @@ pub(crate) async fn write_events(
         .await
         {
             Either::Left((0, _)) => {
-                eprintln!("Event channel dropped, stopping event writer task!");
+                warn!("Event channel dropped, stopping event writer task!");
                 return Ok(());
             }
             Either::Left((c, _)) => c,
             Either::Right(_) => {
-                eprintln!("Stopping event writer task!");
+                info!("Stopping event writer task!");
                 return Ok(());
             }
         };
@@ -85,6 +86,7 @@ pub(crate) async fn write_events(
             }
             cache_misses += 1;
 
+            // TODO: Log with tracing
             println!("{}", serde_json::to_string(&event)?);
 
             batch.insert(
@@ -106,7 +108,7 @@ pub(crate) async fn write_events(
             .inc_by(cache_misses);
         PROM_DB_BYTES.inc_by(bytes_synced.try_into().unwrap());
 
-        eprintln!(
+        debug!(
             "Processed {} events, out of which {} were already seen and {} were new. {} bytes synced to DB.",
             events_count, cache_hits, cache_misses, bytes_synced
         );
@@ -118,7 +120,7 @@ pub(crate) async fn watch_events(
     events_tx: Sender<Event>,
     mut term_rx: broadcast::Receiver<()>,
 ) -> Result<(), KesError> {
-    eprintln!("Starting event watcher task...");
+    info!("Starting event watcher task...");
 
     let api: Api<Event> = Api::all(client);
 
@@ -137,10 +139,10 @@ pub(crate) async fn watch_events(
         match select(stream.next(), pin!(term_rx.recv())).await {
             Either::Left((Some(Ok(event)), _)) => events_tx.send(event).await?,
             Either::Left((Some(Err(e)), _)) => {
-                eprintln!("Error receiving events: {:?}", e);
+                error!("Error receiving events: {:?}", e);
             }
             Either::Left((None, _)) | Either::Right(_) => {
-                eprintln!("Stopping event watcher task!");
+                warn!("Stopping event watcher task!");
                 return Ok(());
             }
         }
@@ -151,7 +153,7 @@ pub(crate) async fn clean_cache(
     db: sled::Db,
     mut term_rx: broadcast::Receiver<()>,
 ) -> Result<(), KesError> {
-    eprintln!("Starting cache cleaner task...");
+    info!("Starting cache cleaner task...");
     loop {
         let now = UNIX_EPOCH.elapsed()?.as_secs();
         let mut purged: usize = 0;
@@ -166,7 +168,7 @@ pub(crate) async fn clean_cache(
         }
 
         if purged > 0 {
-            eprintln!(
+            debug!(
                 "Purged {} entries older than {} secs from the cache",
                 purged, CONFIG.cache_ttl
             );
@@ -188,7 +190,7 @@ pub(crate) async fn clean_cache(
         )
         .await
         {
-            eprintln!("Stopping cache cleaner task!");
+            info!("Stopping cache cleaner task!");
             return Ok(());
         };
     }
