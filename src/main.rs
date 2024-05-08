@@ -11,10 +11,47 @@ mod types;
 
 use config::CONFIG;
 use tasks::{clean_cache, watch_events, write_events};
+use tracing::{info, warn};
+use tracing_subscriber::{
+    fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+};
 use types::KesError;
+
+include!(concat!(env!("OUT_DIR"), "/release.rs"));
+
+static DEFAULT_LOG_LEVEL: &str = "kubernetes_event_stream=debug";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _sentry = sentry::init(sentry::ClientOptions {
+        release: sentry_release_version(),
+        ..Default::default()
+    });
+
+    // Console logging filter
+    let filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new(DEFAULT_LOG_LEVEL))
+        .unwrap();
+
+    // Console logging parameters
+    let fmt = tracing_subscriber::fmt::layer()
+        .with_file(true)
+        .with_level(true)
+        .with_line_number(true)
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_span_events(FmtSpan::NONE)
+        .with_thread_names(true)
+        .json()
+        .flatten_event(true)
+        .with_filter(filter);
+
+    // Tracing framework registry
+    tracing_subscriber::registry()
+        .with(sentry_tracing::layer())
+        .with(fmt)
+        .init();
+
     let db = get_db(&CONFIG.cache_db)?;
 
     let client = kube::Client::try_default().await?;
@@ -39,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Give the tasks a chance to notice and stop.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    eprintln!("Bye!");
+    info!("Bye!");
 
     Ok(())
 }
@@ -50,7 +87,7 @@ async fn term_request() -> Result<(), KesError> {
         Box::pin(signal(SignalKind::terminate())?.recv()),
     )
     .await;
-    eprintln!("User initiatied shutdown started!");
+    info!("User initiatied shutdown started!");
     Ok(())
 }
 
@@ -59,7 +96,7 @@ fn get_db(path: &Path) -> Result<sled::Db, sled::Error> {
         Ok(db) => Ok(db),
         Err(sled::Error::Corruption { .. } | sled::Error::Unsupported(_)) => {
             std::fs::remove_dir_all(path)?;
-            eprintln!("DB corrupt; recreating it");
+            warn!("DB corrupt; recreating it");
             get_db(path)
         }
         Err(e) => Err(e),

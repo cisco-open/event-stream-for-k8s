@@ -2,6 +2,7 @@ use std::env::var;
 use std::path::PathBuf;
 
 use once_cell::sync::Lazy;
+use tracing::debug;
 
 pub(crate) static CONFIG: Lazy<Config> = Lazy::new(Config::from_env);
 
@@ -23,7 +24,7 @@ impl Config {
                 .unwrap_or(CACHE_TTL_DEFAULT),
             cache_db: var("CACHE_DB").unwrap_or(CACHE_DB_DEFAULT.into()).into(),
         };
-        eprintln!("Config: {:?}", config);
+        debug!("Config: {:?}", config);
         config
     }
 }
