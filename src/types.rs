@@ -3,8 +3,9 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use k8s_openapi::chrono::Utc;
 use k8s_openapi::serde::Serialize;
 use tokio::sync::mpsc::error::SendError;
+use tracing::warn;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub(crate) struct KubernetesEvent {
     pub(crate) time: Time,
     pub(crate) kubernetes_event: Event,
@@ -39,8 +40,7 @@ impl From<Event> for KubernetesEvent {
                     .as_ref()
                     .cloned()
                     .unwrap_or_else(|| {
-                        eprintln!("No timestamp in event? Using current time.");
-
+                        warn!("No timestamp in event? Using current time.");
                         Time(Utc::now())
                     }),
             ),
