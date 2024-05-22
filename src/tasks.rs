@@ -15,7 +15,7 @@ use prometheus_exporter::prometheus::{
 use sled::Batch;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::config::CONFIG;
 use crate::types::{KesError, KubernetesEvent};
@@ -23,7 +23,20 @@ use crate::{u64_to_u8_arr, u8_slice_to_u64};
 
 static PROM_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        opts!("kube_event_stream_events_processed", "Events seen"),
+        opts!("kube_event_stream_events_count", "Events types seen."),
+        &[
+            "event_type",
+            "event_reason",
+            "event_kind",
+            "event_namespace"
+        ]
+    )
+    .unwrap()
+});
+
+static PROM_DB_PROC: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        opts!("kube_event_stream_cachedb_events_processed", "Events seen"),
         &["type"]
     )
     .unwrap()
@@ -89,6 +102,23 @@ pub(crate) async fn write_events(
             // TODO: Log with tracing
             println!("{}", serde_json::to_string(&event)?);
 
+            PROM_EVENTS
+                .with_label_values(&[
+                    &event.kubernetes_event.type_.unwrap_or("-".to_string()),
+                    &event.kubernetes_event.reason.unwrap_or("-".to_string()),
+                    &event
+                        .kubernetes_event
+                        .involved_object
+                        .kind
+                        .unwrap_or("-".to_string()),
+                    &event
+                        .kubernetes_event
+                        .involved_object
+                        .namespace
+                        .unwrap_or("-".to_string()),
+                ])
+                .inc();
+
             batch.insert(
                 key.as_str(),
                 &u64_to_u8_arr(UNIX_EPOCH.elapsed()?.as_secs()),
@@ -97,13 +127,13 @@ pub(crate) async fn write_events(
         db.apply_batch(batch)?;
         let bytes_synced = db.flush_async().await?;
 
-        PROM_EVENTS
+        PROM_DB_PROC
             .with_label_values(&["total"])
             .inc_by(events_count.try_into().unwrap());
-        PROM_EVENTS
+        PROM_DB_PROC
             .with_label_values(&["cache_hits"])
             .inc_by(cache_hits);
-        PROM_EVENTS
+        PROM_DB_PROC
             .with_label_values(&["cache_misses"])
             .inc_by(cache_misses);
         PROM_DB_BYTES.inc_by(bytes_synced.try_into().unwrap());
@@ -139,7 +169,7 @@ pub(crate) async fn watch_events(
         match select(stream.next(), pin!(term_rx.recv())).await {
             Either::Left((Some(Ok(event)), _)) => events_tx.send(event).await?,
             Either::Left((Some(Err(e)), _)) => {
-                error!("Error receiving events: {:?}", e);
+                warn!("Error receiving events: {:?}", e);
             }
             Either::Left((None, _)) | Either::Right(_) => {
                 warn!("Stopping event watcher task!");
