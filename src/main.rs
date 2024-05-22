@@ -60,11 +60,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _exporter = prometheus_exporter::start("0.0.0.0:9000".parse()?)?;
 
-    let (term_tx, term_rx) = tokio::sync::broadcast::channel::<()>(1);
+    let (term_tx, _) = tokio::sync::broadcast::channel::<()>(1);
 
-    let writer = tokio::spawn(write_events(db.clone(), ev_rx, term_rx.resubscribe()));
-    let cleaner = tokio::spawn(clean_cache(db.clone(), term_rx.resubscribe()));
-    let watcher = tokio::spawn(watch_events(client, ev_tx, term_rx.resubscribe()));
+    let writer = tokio::spawn(write_events(db.clone(), ev_rx, term_tx.subscribe()));
+    let cleaner = tokio::spawn(clean_cache(db.clone(), term_tx.subscribe()));
+    let watcher = tokio::spawn(watch_events(client, ev_tx, term_tx.subscribe()));
     let term_req = tokio::spawn(term_request());
 
     // Wait for any task to complete.

@@ -84,17 +84,17 @@ spec:
       }
     }
 
-    // stage('Integration Test') {
-    //   steps {
-    //     // Run the tests with acceess to GH credentials since we pull k8s manifests and python libraries from our private repos.
-    //     withCredentials([gitUsernamePassword(credentialsId: 'te-github-creds', gitToolName: 'git-tool')]) {
-    //       sh 'git config --global --add url."https://github.com/".insteadOf "git@github.com:"'
-    //       sh 'apt update -y && apt install -y python3-pip || true'
-    //       sh 'pip3 install git+https://github.com/thousandeyes/integ-test-cluster.git'
-    //       sh 'pytest -v --junitxml=target/nextest/default/junit-integtest.xml'
-    //     }
-    //   }
-    // }
+    stage('Integration Test') {
+      steps {
+        // Run the tests with acceess to GH credentials since we pull k8s manifests and python libraries from our private repos.
+        withCredentials([gitUsernamePassword(credentialsId: 'te-github-creds', gitToolName: 'git-tool')]) {
+          sh 'git config --global --add url."https://github.com/".insteadOf "git@github.com:"'
+          sh 'apt update -y && apt install -y python3-pip || true'
+          sh 'pip3 install git+https://github.com/thousandeyes/integ-test-cluster.git'
+          sh 'pytest -v --junitxml=target/nextest/default/junit-integtest.xml'
+        }
+      }
+    }
 
     stage('Sonar Scanner (PR)') {
       when {
@@ -138,11 +138,11 @@ spec:
   }
 
   // Disable this until we have some tests
-  // post {
-  //   always {
-  //     junit 'target/nextest/default/junit*.xml'
-  //   }
-  // }
+  post {
+    always {
+      junit 'target/nextest/default/junit*.xml'
+    }
+  }
 
   options {
       timeout(time: 90, unit: 'MINUTES')

@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 artifactory.thousandeyes.com/docker/te-rust-musl-builder:latest as builder
+FROM --platform=linux/amd64 artifactory.thousandeyes.com/docker/te-rust-musl-builder:latest AS builder
 
 ARG target=x86_64-unknown-linux-gnu
 
