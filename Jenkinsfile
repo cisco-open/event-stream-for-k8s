@@ -13,7 +13,7 @@ metadata:
 spec:
   initContainers:
     - name: docker-setup
-      image: gcr.io/te-releng-ci/te-rust-musl-builder:latest
+      image: artifactory.ci.gitops.1keyes.net/te-docker-release/te-rust-musl-builder:latest
       command: ["cp", "-v", "/root/docker-config/config.json", "/root/.docker/"]
       volumeMounts:
       - name: dockerconfig
@@ -22,7 +22,7 @@ spec:
         mountPath: /root/docker-config
   containers:
     - name: rust-builder
-      image: gcr.io/te-releng-ci/te-rust-musl-builder:latest
+      image: artifactory.ci.gitops.1keyes.net/te-docker-release/te-rust-musl-builder:latest
       command:
         - cat
       tty: true
