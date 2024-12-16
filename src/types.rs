@@ -7,7 +7,11 @@ use tracing::warn;
 
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct KubernetesEvent {
+    /// The timestamp of the event, [derived](https://thousandeyes.slack.com/archives/C015A5H6V51/p1718648430883559)
+    /// from (in order of precedence): lastTimestamp, firstTimestamp, or
+    /// metadata.creationTimestamp.
     pub(crate) time: Time,
+    /// The event itself, stored this way to avoid key collisions in ELK.
     pub(crate) kubernetes_event: Event,
 }
 
@@ -31,8 +35,6 @@ impl KubernetesEvent {
 
 impl From<Event> for KubernetesEvent {
     fn from(ev: Event) -> Self {
-        // Timestamp events like Fluent Bit does:
-        // https://docs.fluentbit.io/manual/pipeline/inputs/kubernetes-events#event-timestamp
         let time = ev.last_timestamp.as_ref().cloned().unwrap_or(
             ev.first_timestamp.as_ref().cloned().unwrap_or(
                 ev.metadata
