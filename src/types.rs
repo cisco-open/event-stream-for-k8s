@@ -1,3 +1,5 @@
+// Copyright 2024 Cisco Systems, Inc. and its affiliates
+
 use k8s_openapi::api::core::v1::Event;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use k8s_openapi::chrono::Utc;

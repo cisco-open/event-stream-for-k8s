@@ -33,3 +33,8 @@ spec:
 
 - `CACHE_TTL` (default `3600`): How long to cache Events.
 - `CACHE_DB` (default `./events-db`): Path to the cache.
+
+
+## License
+
+Distributed under the Apache 2.0 license. See [LICENSE](LICENSE) for more information.
