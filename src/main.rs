@@ -21,7 +21,7 @@ use types::KesError;
 
 include!(concat!(env!("OUT_DIR"), "/release.rs"));
 
-static DEFAULT_LOG_LEVEL: &str = "kubernetes_event_stream=debug";
+static DEFAULT_LOG_LEVEL: &str = "event_stream_for_k8s=debug";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

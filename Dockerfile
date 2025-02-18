@@ -16,7 +16,7 @@ FROM artifactory.thousandeyes.com/docker-hub/ubuntu:latest
 WORKDIR /
 
 COPY --from=builder /etc/ssl /etc/ssl
-COPY --from=builder /home/rust/.cargo/bin/kubernetes-event-stream /
+COPY --from=builder /home/rust/.cargo/bin/event-stream-for-k8s /
 
 CMD []
-ENTRYPOINT [ "/kubernetes-event-stream"]
+ENTRYPOINT [ "/event-stream-for-k8s"]

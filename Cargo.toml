@@ -1,5 +1,5 @@
 [package]
-name = "kubernetes-event-stream"
+name = "event-stream-for-k8s"
 version = "0.2.0"
 edition = "2021"
 

@@ -1,6 +1,6 @@
 # How to Contribute
 
-Thanks for your interest in contributing to Kubernetes Event Stream! Here are a few
+Thanks for your interest in contributing to Event Stream for K8s! Here are a few
 general guidelines on contributing and reporting bugs that we ask you to review.
 Following these guidelines helps to communicate that you respect the time of the
 contributors managing and developing this open source project. In return, they
@@ -18,7 +18,7 @@ in any real-time space e.g., Slack, Discord, etc.
 
 Before reporting a new issue, please ensure that the issue was not already
 reported or fixed by searching through our [issues
-list](https://github.com/cisco-open/kubernetes-event-stream/issues).
+list](https://github.com/cisco-open/event-stream-for-k8s/issues).
 
 When creating a new issue, please be sure to include a **title and clear
 description**, as much relevant information as possible, and, if possible, a
@@ -39,7 +39,7 @@ major version release.
 
 ## Other Ways to Contribute
 
-We welcome anyone that wants to contribute to Kubernetes Event Stream to triage and
+We welcome anyone that wants to contribute to Event Stream for K8s to triage and
 reply to open issues to help troubleshoot and fix existing bugs. Here is what
 you can do:
 
@@ -47,12 +47,12 @@ you can do:
   _[Reporting Issues](#reporting-issues)_ section, providing feedback to the
   issue's author on what might be missing.
 - Review and update the existing content of our
-  [Wiki](https://github.com/cisco-open/kubernetes-event-stream/wiki) with up-to-date
+  [Wiki](https://github.com/cisco-open/event-stream-for-k8s/wiki) with up-to-date
   instructions and code samples.
 - Review existing pull requests, and testing patches against real existing
-  applications that use Kubernetes Event Stream.
+  applications that use Event Stream for K8s.
 - Write a test, or add a missing test case to an existing test.
 
-Thanks again for your interest on contributing to Kubernetes Event Stream!
+Thanks again for your interest on contributing to Event Stream for K8s!
 
 :heart:
