@@ -1,17 +1,17 @@
-# kubernetes-event-stream
+# event-stream-for-k8s
 
-Kubernetes Event Stream reads Events from the Kubernetes API and logs them to standard output.
+Event Stream for K8s reads Events from the Kubernetes API and logs them to standard output.
 
 Perfect for cluster operators who want to log [Events](https://pkg.go.dev/k8s.io/api/events/v1#Event) to long-term storage, e.g., an ELK stack.
 
 ## Usage
 
-`kubernetes-event-stream` is best deployed as a single-replica `StatefulSet` with persistent storage. For example:
+`event-stream-for-k8s` is best deployed as a single-replica `StatefulSet` with persistent storage. For example:
 
 ```yaml
 kind: StatefulSet
 metadata:
-  name: kubernetes-event-stream
+  name: event-stream-for-k8s
 spec:
   replicas: 1
   volumeClaimTemplates:

@@ -1,7 +1,7 @@
 # Security Policies and Procedures
 
 This document outlines security procedures and general policies for the
-Kubernetes Event Stream project.
+Event Stream for K8s project.
 
 - [Disclosing a security issue](#disclosing-a-security-issue)
 - [Vulnerability management](#vulnerability-management)
@@ -9,12 +9,12 @@ Kubernetes Event Stream project.
 
 ## Disclosing a security issue
 
-The Kubernetes Event Stream maintainers take all security issues in the project
-seriously. Thank you for improving the security of Kubernetes Event Stream. We
+The Event Stream for K8s maintainers take all security issues in the project
+seriously. Thank you for improving the security of Event Stream for K8s. We
 appreciate your dedication to responsible disclosure and will make every effort
 to acknowledge your contributions.
 
-Kubernetes Event Stream leverages GitHub's private vulnerability reporting.
+Event Stream for K8s leverages GitHub's private vulnerability reporting.
 
 To learn more about this feature and how to submit a vulnerability report,
 review [GitHub's documentation on private reporting](https://docs.github.com/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability).

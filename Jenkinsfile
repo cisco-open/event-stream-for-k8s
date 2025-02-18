@@ -53,7 +53,7 @@ spec:
   }
 
   environment {
-    IMAGE_REPO = 'kubernetes-event-stream'
+    IMAGE_REPO = 'event-stream-for-k8s'
     PKG_VER = sh(script: 'echo $(grep ^version Cargo.toml | cut -d= -f2 | tr -d "[:blank:]" | tr -d \\")', returnStdout: true).trim()
     GIT_COMMIT = sh(script: 'git config --global --add safe.directory \'*\'; git rev-parse --short=8 HEAD', returnStdout: true).trim()
     BUILD_DATE = sh(script: 'date -u +%Y%m%d', returnStdout: true).trim()

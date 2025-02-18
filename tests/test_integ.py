@@ -30,7 +30,7 @@ def build_event(pod):
 
 def parse_custom_events(cluster):
     logs: str = cluster.kubectl(
-        ["logs", "kubernetes-event-stream-0", "-n", "test"], as_dict=False
+        ["logs", "event-stream-for-k8s-0", "-n", "test"], as_dict=False
     )
 
     events = []
@@ -47,7 +47,7 @@ def parse_custom_events(cluster):
 def test_running(cluster):
     # Wait for the pod to start
     cluster.wait(
-        "pod/kubernetes-event-stream-0",
+        "pod/event-stream-for-k8s-0",
         "condition=Ready=True",
         timeout=180,
         namespace="test",
@@ -73,12 +73,12 @@ def test_running(cluster):
 
     # Delete the pod
     cluster.kubectl(
-        ["delete", "pod", "kubernetes-event-stream-0", "-n", "test"], as_dict=False
+        ["delete", "pod", "event-stream-for-k8s-0", "-n", "test"], as_dict=False
     )
 
     # Wait for the pod to start again
     cluster.wait(
-        "pod/kubernetes-event-stream-0",
+        "pod/event-stream-for-k8s-0",
         "condition=Ready=True",
         timeout=180,
         namespace="test",
