@@ -1,22 +1,11 @@
-FROM --platform=linux/amd64 artifactory.thousandeyes.com/docker/te-rust-musl-builder:latest AS builder
+FROM docker.io/library/rust:1.85 AS builder
 
-ARG target=x86_64-unknown-linux-gnu
-
-WORKDIR /home/rust/src
-
+WORKDIR /usr/src/app
 COPY . .
+RUN cargo install --path .
 
-RUN --mount=type=cache,target=/home/rust/.cargo/git \
-    --mount=type=cache,target=/home/rust/.cargo/registry \
-    --mount=type=cache,target=target \
-    cargo install --path=. --target=${target}
-
-FROM artifactory.thousandeyes.com/docker-hub/ubuntu:latest
+FROM gcr.io/distroless/cc
 
 WORKDIR /
-
-COPY --from=builder /etc/ssl /etc/ssl
-COPY --from=builder /home/rust/.cargo/bin/event-stream-for-k8s /
-
-CMD []
-ENTRYPOINT [ "/event-stream-for-k8s"]
+COPY --from=builder /usr/local/cargo/bin/event-stream-for-k8s /
+CMD ["/event-stream-for-k8s"]
