@@ -359,6 +359,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-stream-for-k8s"
+version = "0.2.0"
+dependencies = [
+ "futures",
+ "k8s-openapi",
+ "kube",
+ "once_cell",
+ "prometheus_exporter",
+ "sentry",
+ "sentry-tracing",
+ "serde",
+ "serde_json",
+ "sled",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-log",
+ "tracing-serde",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -951,28 +973,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
-]
-
-[[package]]
-name = "event-stream-for-k8s"
-version = "0.2.0"
-dependencies = [
- "futures",
- "k8s-openapi",
- "kube",
- "once_cell",
- "prometheus_exporter",
- "sentry",
- "sentry-tracing",
- "serde",
- "serde_json",
- "sled",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-log",
- "tracing-serde",
- "tracing-subscriber",
 ]
 
 [[package]]
