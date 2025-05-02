@@ -34,6 +34,9 @@ spec:
 - `CACHE_TTL` (default `3600`): How long to cache Events.
 - `CACHE_DB` (default `./events-db`): Path to the cache.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
