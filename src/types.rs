@@ -60,7 +60,7 @@ impl From<Event> for KubernetesEvent {
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum KesError {
     #[error(transparent)]
-    ChannelSend(#[from] SendError<Event>),
+    ChannelSend(#[from] Box<SendError<Event>>),
     #[error(transparent)]
     Watcher(#[from] kube::runtime::watcher::Error),
     #[error(transparent)]
