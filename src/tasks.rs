@@ -169,7 +169,7 @@ pub(crate) async fn watch_events(
 
     loop {
         match select(stream.next(), pin!(term_rx.recv())).await {
-            Either::Left((Some(Ok(event)), _)) => events_tx.send(event).await?,
+            Either::Left((Some(Ok(event)), _)) => events_tx.send(event).await.map_err(Box::new)?,
             Either::Left((Some(Err(e)), _)) => {
                 warn!("Error receiving events: {:?}", e);
             }
