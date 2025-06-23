@@ -26,7 +26,7 @@ tracing-subscriber = { version = "0.3.19", features = [
     "registry",
     "valuable",
 ] }
-sentry = { version = "0.38.1", default-features = false, features = [
+sentry = { version = "0.40.0", default-features = false, features = [
     "backtrace",
     "contexts",
     "panic",
