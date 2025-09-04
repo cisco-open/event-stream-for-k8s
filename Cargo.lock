@@ -444,7 +444,7 @@ dependencies = [
  "once_cell",
  "prometheus_exporter",
  "sentry",
- "sentry-tracing 0.41.0",
+ "sentry-tracing",
  "serde",
  "serde_json",
  "sled",
@@ -2019,9 +2019,9 @@ dependencies = [
  "rustls",
  "sentry-backtrace",
  "sentry-contexts",
- "sentry-core 0.42.0",
+ "sentry-core",
  "sentry-panic",
- "sentry-tracing 0.42.0",
+ "sentry-tracing",
  "tokio",
  "ureq",
 ]
@@ -2034,7 +2034,7 @@ checksum = "68e299dd3f7bcf676875eee852c9941e1d08278a743c32ca528e2debf846a653"
 dependencies = [
  "backtrace",
  "regex",
- "sentry-core 0.42.0",
+ "sentry-core",
 ]
 
 [[package]]
@@ -2047,20 +2047,8 @@ dependencies = [
  "libc",
  "os_info",
  "rustc_version",
- "sentry-core 0.42.0",
+ "sentry-core",
  "uname",
-]
-
-[[package]]
-name = "sentry-core"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00e9bd2cadaeda3af41e9fa5d14645127d6f6a4aec73da3ae38e477ecafd3682"
-dependencies = [
- "rand",
- "sentry-types 0.41.0",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -2070,7 +2058,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "deaa38b94e70820ff3f1f9db3c8b0aef053b667be130f618e615e0ff2492cbcc"
 dependencies = [
  "rand",
- "sentry-types 0.42.0",
+ "sentry-types",
  "serde",
  "serde_json",
  "url",
@@ -2083,19 +2071,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b7a23b13c004873de3ce7db86eb0f59fe4adfc655a31f7bbc17fd10bacc9bfe"
 dependencies = [
  "sentry-backtrace",
- "sentry-core 0.42.0",
-]
-
-[[package]]
-name = "sentry-tracing"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c25c47d36bc80c74d26d568ffe970c37b337c061b7234ad6f2d159439c16f000"
-dependencies = [
- "bitflags 2.9.1",
- "sentry-core 0.41.0",
- "tracing-core",
- "tracing-subscriber",
+ "sentry-core",
 ]
 
 [[package]]
@@ -2106,26 +2082,9 @@ checksum = "fac841c7050aa73fc2bec8f7d8e9cb1159af0b3095757b99820823f3e54e5080"
 dependencies = [
  "bitflags 2.9.1",
  "sentry-backtrace",
- "sentry-core 0.42.0",
+ "sentry-core",
  "tracing-core",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "sentry-types"
-version = "0.41.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a08e7154abe2cd557f26fd70038452810748aefdf39bc973f674421224b147c1"
-dependencies = [
- "debugid",
- "hex",
- "rand",
- "serde",
- "serde_json",
- "thiserror 2.0.16",
- "time",
- "url",
- "uuid",
 ]
 
 [[package]]
