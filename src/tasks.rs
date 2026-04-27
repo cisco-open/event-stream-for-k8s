@@ -3,16 +3,16 @@
 use std::pin::pin;
 use std::time::{Duration, UNIX_EPOCH};
 
-use futures::future::{select, Either};
 use futures::StreamExt;
+use futures::future::{Either, select};
 use k8s_openapi::api::core::v1::Event;
-use kube::runtime::watcher::{self, InitialListStrategy, ListSemantic};
 use kube::runtime::WatchStreamExt;
+use kube::runtime::watcher::{self, InitialListStrategy, ListSemantic};
 use kube::{Api, Client};
 use once_cell::sync::Lazy;
 use prometheus_exporter::prometheus::{
-    opts, register_int_counter, register_int_counter_vec, register_int_gauge_vec, IntCounter,
-    IntCounterVec, IntGaugeVec,
+    IntCounter, IntCounterVec, IntGaugeVec, opts, register_int_counter, register_int_counter_vec,
+    register_int_gauge_vec,
 };
 use sled::Batch;
 use tokio::sync::broadcast;
@@ -21,7 +21,7 @@ use tracing::{debug, info, warn};
 
 use crate::config::CONFIG;
 use crate::types::{KesError, KubernetesEvent};
-use crate::{u64_to_u8_arr, u8_slice_to_u64};
+use crate::{u8_slice_to_u64, u64_to_u8_arr};
 
 static PROM_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(

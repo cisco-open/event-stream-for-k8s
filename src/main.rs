@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use futures::future::{select, select_all};
 use k8s_openapi::api::core::v1::Event;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 
 mod config;
 mod tasks;
@@ -15,7 +15,7 @@ use config::CONFIG;
 use tasks::{clean_cache, watch_events, write_events};
 use tracing::{info, warn};
 use tracing_subscriber::{
-    fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+    EnvFilter, Layer, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt,
 };
 use types::KesError;
 
