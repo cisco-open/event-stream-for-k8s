@@ -2,7 +2,7 @@
 
 use k8s_openapi::api::core::v1::Event;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
-use k8s_openapi::chrono::Utc;
+use k8s_openapi::jiff::Timestamp;
 use k8s_openapi::serde::Serialize;
 use tokio::sync::mpsc::error::SendError;
 use tracing::warn;
@@ -45,7 +45,7 @@ impl From<Event> for KubernetesEvent {
                     .cloned()
                     .unwrap_or_else(|| {
                         warn!("No timestamp in event? Using current time.");
-                        Time(Utc::now())
+                        Time(Timestamp::now())
                     }),
             ),
         );
