@@ -14,6 +14,19 @@ metadata:
   name: event-stream-for-k8s
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: event-stream-for-k8s
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: event-stream-for-k8s
+    spec:
+      containers:
+      - name: main
+        volumeMounts:
+        - name: events-db
+          mountPath: /events-db
   volumeClaimTemplates:
   - metadata:
       name: events-db
@@ -21,12 +34,6 @@ spec:
       accessModes: [ReadWriteOnce]
       resources: {requests: {storage: 1Gi}}
       storageClassName: gp2  # or similar
-  spec:
-    containers:
-    - name: main
-      volumeMounts:
-      - name: events-db
-        mountPath: /events-db
 ```
 
 ### Environment variables
