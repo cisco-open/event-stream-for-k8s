@@ -34,7 +34,7 @@ sentry = { version = "0.48.1", default-features = false, features = [
     "reqwest",
     "rustls",
 ] }
-sentry-tracing = "0.48.1"
+sentry-tracing = "0.48.2"
 
 [profile.release]
 debug = true
