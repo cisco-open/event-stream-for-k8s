@@ -101,8 +101,7 @@ pub(crate) async fn write_events(
             }
             cache_misses += 1;
 
-            // TODO: Log with tracing
-            println!("{}", serde_json::to_string(&event)?);
+            debug!(?event);
 
             PROM_EVENTS
                 .with_label_values(&[
