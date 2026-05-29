@@ -6,7 +6,6 @@ use std::time::Duration;
 use futures::future::{select, select_all};
 use k8s_openapi::api::core::v1::Event;
 use tokio::signal::unix::{SignalKind, signal};
-use tokio::task::JoinHandle;
 
 mod config;
 mod tasks;
@@ -76,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let term_req = tokio::spawn(term_request());
 
     // Wait for any task to complete.
-    let task_result = wait_for_first_task(writer, cleaner, watcher, term_req).await;
+    let (task_result, _, _) = select_all(vec![writer, cleaner, watcher, term_req]).await;
 
     // Broadcast the shutdown signal to all tasks.
     term_tx.send(())?;
@@ -84,21 +83,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Give the tasks a chance to notice and stop.
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    task_result?;
+    task_result??;
 
     info!("Bye!");
 
-    Ok(())
-}
-
-async fn wait_for_first_task(
-    writer: JoinHandle<Result<(), KesError>>,
-    cleaner: JoinHandle<Result<(), KesError>>,
-    watcher: JoinHandle<Result<(), KesError>>,
-    term_req: JoinHandle<Result<(), KesError>>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let (task_result, _, _) = select_all(vec![writer, cleaner, watcher, term_req]).await;
-    task_result??;
     Ok(())
 }
 
