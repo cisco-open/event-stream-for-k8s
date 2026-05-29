@@ -25,6 +25,10 @@ static DEFAULT_LOG_LEVEL: &str = "event_stream_for_k8s=debug";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("failed to install aws-lc-rs as the default Rustls CryptoProvider");
+
     let _sentry = sentry::init(sentry::ClientOptions {
         release: sentry_release_version(),
         ..Default::default()
