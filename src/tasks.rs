@@ -15,6 +15,7 @@ use prometheus_exporter::prometheus::{
     register_int_gauge_vec,
 };
 use sled::Batch;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{debug, info, warn};
@@ -65,9 +66,21 @@ static PROM_DB_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
 
 pub(crate) async fn write_events(
     db: sled::Db,
+    events_rx: Receiver<Event>,
+    term_rx: broadcast::Receiver<()>,
+) -> Result<(), KesError> {
+    write_events_to(db, events_rx, term_rx, tokio::io::stdout()).await
+}
+
+pub(crate) async fn write_events_to<W>(
+    db: sled::Db,
     mut events_rx: Receiver<Event>,
     mut term_rx: broadcast::Receiver<()>,
-) -> Result<(), KesError> {
+    mut events_out: W,
+) -> Result<(), KesError>
+where
+    W: AsyncWrite + Unpin,
+{
     info!("Starting event writer task...");
     loop {
         let mut events = vec![];
@@ -92,6 +105,7 @@ pub(crate) async fn write_events(
         let mut batch = Batch::default();
         let mut cache_hits: u64 = 0;
         let mut cache_misses: u64 = 0;
+        let mut event_output = Vec::new();
         for event in events {
             let event = KubernetesEvent::from(event);
             let key = event.key();
@@ -101,8 +115,8 @@ pub(crate) async fn write_events(
             }
             cache_misses += 1;
 
-            // TODO: Log with tracing
-            println!("{}", serde_json::to_string(&event)?);
+            serde_json::to_writer(&mut event_output, &event)?;
+            event_output.push(b'\n');
 
             PROM_EVENTS
                 .with_label_values(&[
@@ -126,6 +140,12 @@ pub(crate) async fn write_events(
                 &u64_to_u8_arr(UNIX_EPOCH.elapsed()?.as_secs()),
             );
         }
+
+        if !event_output.is_empty() {
+            events_out.write_all(&event_output).await?;
+            events_out.flush().await?;
+        }
+
         db.apply_batch(batch)?;
         let bytes_synced = db.flush_async().await?;
 
