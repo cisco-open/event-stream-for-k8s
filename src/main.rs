@@ -25,6 +25,10 @@ static DEFAULT_LOG_LEVEL: &str = "event_stream_for_k8s=debug";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("failed to install aws-lc-rs as the default Rustls CryptoProvider");
+
     let _sentry = sentry::init(sentry::ClientOptions {
         release: sentry_release_version(),
         ..Default::default()
@@ -37,6 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Console logging parameters
     let fmt = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
         .with_file(true)
         .with_level(true)
         .with_line_number(true)
@@ -70,13 +75,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let term_req = tokio::spawn(term_request());
 
     // Wait for any task to complete.
-    let _ = select_all(vec![writer, cleaner, watcher, term_req]).await;
+    let (task_result, _, _) = select_all(vec![writer, cleaner, watcher, term_req]).await;
 
     // Broadcast the shutdown signal to all tasks.
     term_tx.send(())?;
 
     // Give the tasks a chance to notice and stop.
     tokio::time::sleep(Duration::from_secs(1)).await;
+
+    task_result??;
 
     info!("Bye!");
 
